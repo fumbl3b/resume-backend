@@ -2,21 +2,26 @@ import os
 import logging
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 import openai
 
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
+CORS(app)
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = app.logger
 logger.setLevel(logging.DEBUG)
 
-def extract_relevant_keywords(job_description: str, model="gpt-3.5-turbo") -> str:
+# Define default model
+DEFAULT_MODEL = "gpt-4o"
+
+def extract_relevant_keywords(job_description: str, model=DEFAULT_MODEL) -> str:
     prompt = (
-        "You are a professional career advisor. Extract the most important keywords, technical skills, "
+        "You are a professional career advisor. Extract the most important technical skills, intrapersonal sklls, "
         "and qualifications from the following job description. "
         "Return the results as a comma-separated list.\n\n"
         f"Job Description:\n{job_description}\n\n"
@@ -33,7 +38,25 @@ def extract_relevant_keywords(job_description: str, model="gpt-3.5-turbo") -> st
     logger.debug(f"Keywords extracted: {result}")
     return result
 
-def suggest_resume_improvements(resume_text: str, job_description: str, model="gpt-3.5-turbo") -> str:
+def extract_benefits(job_description: str, model=DEFAULT_MODEL) -> str:
+    prompt = (
+        "You are a professional career advisor.  Extract all the benefits listed for the following job description."
+        "If compensation range is listed, please return that first.  Return all the results as a comma-separated list.\n\n"
+        f"Job Description:\n{job_description}\n\n"
+    )
+
+    logger.debug("Sending request to OpenAI for benefit extraction...")
+    response = openai.ChatCompletion.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=300,
+        temperature=0.3
+    )
+    result = response.choices[0].message.content.strip()
+    logger.debug(f"Benefits Extracted: {result}")
+    return result
+
+def suggest_resume_improvements(resume_text: str, job_description: str, model=DEFAULT_MODEL) -> str:
     prompt = (
         "You are a professional resume writer. You have been given a resume (in LaTeX) and a job description. "
         "Analyze the resume and identify how it can be improved and tailored to better match the job description. "
@@ -56,7 +79,7 @@ def suggest_resume_improvements(resume_text: str, job_description: str, model="g
     logger.debug(f"Suggestions generated: {result}")
     return result
 
-def generate_optimized_resume(resume_text: str, suggestions: str, model="gpt-3.5-turbo") -> str:
+def generate_optimized_resume(resume_text: str, suggestions: str, model=DEFAULT_MODEL) -> str:
     prompt = (
         "You are a professional resume writer skilled in LaTeX formatting. "
         "You have a non-LaTeX-formatted resume and a set of improvement suggestions. "
@@ -95,6 +118,23 @@ def api_extract_keywords():
 
     keywords = extract_relevant_keywords(job_description)
     return jsonify({"keywords": keywords})
+
+@app.route('/extract-benefits', methods=['POST'])
+def api_extract_benefits():
+    logger.debug("Received request at /extract-benefits endpoint")
+    data = request.get_json()
+    if not data:
+        logger.debug("No JSON data provided.")
+        return jsonify({"error": "No JSON data provided"}), 400
+
+    job_description = data.get('job_description', '')
+    logger.debug(f"Job description: {job_description}")
+    if not job_description:
+        logger.debug("No job description provided.")
+        return jsonify({"error": "No job description provided"}), 400
+
+    benefits = extract_benefits(job_description)
+    return jsonify({"keywords": benefits})
 
 @app.route('/suggest-improvements', methods=['POST'])
 def api_suggest_improvements():
@@ -140,4 +180,4 @@ def api_generate_optimized_resume():
 
 if __name__ == "__main__":
     logger.debug("Starting Flask server...")
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=True, host='0.0.0.0', port=5001, use_reloader=True)
