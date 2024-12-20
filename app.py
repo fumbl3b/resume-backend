@@ -4,12 +4,14 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from openai import OpenAI
+from version import __version__
 
 load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = Flask(__name__)
+app.config['VERSION'] = __version__
 CORS(app)
 
 # Configure logging
@@ -170,6 +172,14 @@ def api_generate_optimized_resume():
 
     optimized_resume = generate_optimized_resume(resume_text, suggestions)
     return jsonify({"optimized_resume": optimized_resume})
+
+@app.route('/version', methods=['GET'])
+def get_version():
+    return jsonify({
+        "version": app.config['VERSION'],
+        "status": "alpha",
+        "api": "resume-backend"
+    })
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5001))
