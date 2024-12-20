@@ -5,9 +5,9 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from openai import OpenAI
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 load_dotenv()
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = Flask(__name__)
 CORS(app)
@@ -24,7 +24,7 @@ def extract_relevant_keywords(job_description: str, model=DEFAULT_MODEL) -> str:
     prompt = (
         "You are a professional career advisor. Extract the most important technical skills, intrapersonal sklls, "
         "and qualifications from the following job description. "
-        "Return the results as a comma-separated list.\n\n"
+        "Return the results as a comma-separated list of only these keywords.  Do not include categories.\n\n"
         f"Job Description:\n{job_description}\n\n"
     )
 
