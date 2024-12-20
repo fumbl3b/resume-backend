@@ -1,10 +1,13 @@
 import os
 import logging
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 from openai import OpenAI
 from version import __version__
+from services.file_processor import FileProcessor
+from services.latex_converter import LatexConverter
+import base64
 
 load_dotenv()
 
@@ -21,6 +24,9 @@ logger.setLevel(logging.DEBUG)
 
 # Define default model
 DEFAULT_MODEL = "gpt-4o"
+
+# Add max file size config
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 def extract_relevant_keywords(job_description: str, model=DEFAULT_MODEL) -> str:
     prompt = (
@@ -77,25 +83,25 @@ def suggest_resume_improvements(resume_text: str, job_description: str, model=DE
     return result
 
 def generate_optimized_resume(resume_text: str, suggestions: str, model=DEFAULT_MODEL) -> str:
-    prompt = (
-        "You are a professional resume writer skilled in LaTeX formatting. "
-        "You have a non-LaTeX-formatted resume and a set of improvement suggestions. "
-        "Incorporate these suggestions into the resume and add LaTeX formatting and structure. "
-        "Do not remove the original formatting commands, only update text where it makes sense. "
-        "Make sure to incorporate relevant keywords, highlight experiences and skills that match the job description.\n\n"
-        f"Suggestions:\n{suggestions}\n\n"
-        f"Original Resume:\n{resume_text}\n\n"
-        "Return the full updated resume in LaTeX."
-    )
+    messages = [
+        {"role": "system", "content": "You are a LaTeX resume formatter. Respond only with valid LaTeX code. Do not include any other text or explanations."},
+        {"role": "user", "content": (
+            "Convert this resume into LaTeX format, incorporating the suggested improvements. "
+            "Include all necessary LaTeX commands and structure. "
+            "Return ONLY the LaTeX code with no additional text.\n\n"
+            f"SUGGESTIONS:\n{suggestions}\n\n"
+            f"RESUME:\n{resume_text}"
+        )}
+    ]
 
     logger.debug("Sending request to OpenAI for optimized resume generation...")
-    response = client.chat.completions.create(model=model,
-    messages=[{"role": "user", "content": prompt}],
-    max_tokens=4000,
-    temperature=0.3)
-    result = response.choices[0].message.content.strip()
-    logger.debug(f"Optimized resume generated.")
-    return result
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        max_tokens=4000,
+        temperature=0.1  # Lower temperature for more consistent output
+    )
+    return response.choices[0].message.content.strip()
 
 @app.route('/extract-keywords', methods=['POST'])
 def api_extract_keywords():
@@ -170,8 +176,78 @@ def api_generate_optimized_resume():
         logger.debug("No suggestions provided.")
         return jsonify({"error": "No suggestions provided"}), 400
 
-    optimized_resume = generate_optimized_resume(resume_text, suggestions)
-    return jsonify({"optimized_resume": optimized_resume})
+    try:
+        # Generate LaTeX content
+        latex_content = generate_optimized_resume(resume_text, suggestions)
+        
+        # Convert and get both files
+        tex_base64, pdf_base64 = LatexConverter.create_and_convert(latex_content)
+        
+        return jsonify({
+            "tex_content": tex_base64,
+            "pdf_content": pdf_base64
+        })
+    except Exception as e:
+        logger.error(f"Error generating resume: {str(e)}")
+        return jsonify({"error": "Error generating resume"}), 500
+
+@app.route('/extract-resume-text', methods=['POST'])
+def extract_resume_text():
+    logger.debug("Received file upload request")
+    
+    # Check content type
+    if not request.content_type or 'multipart/form-data' not in request.content_type:
+        logger.error(f"Invalid content type: {request.content_type}")
+        return jsonify({"error": "Invalid content type"}), 415
+
+    if 'file' not in request.files:
+        logger.error("No file in request")
+        return jsonify({"error": "No file provided"}), 400
+        
+    file = request.files['file']
+    if file.filename == '':
+        logger.error("Empty filename")
+        return jsonify({"error": "No file selected"}), 400
+        
+    logger.debug(f"Processing file: {file.filename}")
+    
+    # Validate file type
+    allowed_extensions = {'pdf', 'doc', 'docx', 'tex'}
+    if not file.filename.lower().endswith(tuple(f'.{ext}' for ext in allowed_extensions)):
+        logger.error(f"Invalid file type: {file.filename}")
+        return jsonify({"error": "Invalid file type"}), 415
+        
+    try:
+        text = FileProcessor.extract_text(file.stream, file.filename)
+        logger.debug(f"Successfully extracted text from {file.filename}")
+        return jsonify({"text": text})
+    except ValueError as e:
+        logger.error(f"Value error processing file: {str(e)}")
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Error processing file: {str(e)}")
+        return jsonify({"error": "Error processing file"}), 500
+
+@app.route('/convert-to-pdf', methods=['POST'])
+def convert_to_pdf():
+    logger.debug("Received LaTeX conversion request")
+    
+    data = request.get_json()
+    if not data or 'tex_content' not in data:
+        logger.error("No LaTeX content provided")
+        return jsonify({"error": "No LaTeX content provided"}), 400
+        
+    try:
+        pdf_path = LatexConverter.tex_to_pdf(data['tex_content'])
+        return send_file(
+            pdf_path,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name='resume.pdf'
+        )
+    except Exception as e:
+        logger.error(f"Error converting LaTeX to PDF: {str(e)}")
+        return jsonify({"error": "Error converting to PDF"}), 500
 
 @app.route('/version', methods=['GET'])
 def get_version():
