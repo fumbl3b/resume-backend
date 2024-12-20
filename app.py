@@ -3,10 +3,11 @@ import logging
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import openai
+from openai import OpenAI
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = Flask(__name__)
 CORS(app)
@@ -28,12 +29,10 @@ def extract_relevant_keywords(job_description: str, model=DEFAULT_MODEL) -> str:
     )
 
     logger.debug("Sending request to OpenAI for keyword extraction...")
-    response = openai.ChatCompletion.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=300,
-        temperature=0.3
-    )
+    response = client.chat.completions.create(model=model,
+    messages=[{"role": "user", "content": prompt}],
+    max_tokens=300,
+    temperature=0.3)
     result = response.choices[0].message.content.strip()
     logger.debug(f"Keywords extracted: {result}")
     return result
@@ -46,12 +45,10 @@ def extract_benefits(job_description: str, model=DEFAULT_MODEL) -> str:
     )
 
     logger.debug("Sending request to OpenAI for benefit extraction...")
-    response = openai.ChatCompletion.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=300,
-        temperature=0.3
-    )
+    response = client.chat.completions.create(model=model,
+    messages=[{"role": "user", "content": prompt}],
+    max_tokens=300,
+    temperature=0.3)
     result = response.choices[0].message.content.strip()
     logger.debug(f"Benefits Extracted: {result}")
     return result
@@ -69,12 +66,10 @@ def suggest_resume_improvements(resume_text: str, job_description: str, model=DE
     )
 
     logger.debug("Sending request to OpenAI for resume improvements suggestions...")
-    response = openai.ChatCompletion.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=1000,
-        temperature=0.3
-    )
+    response = client.chat.completions.create(model=model,
+    messages=[{"role": "user", "content": prompt}],
+    max_tokens=1000,
+    temperature=0.3)
     result = response.choices[0].message.content.strip()
     logger.debug(f"Suggestions generated: {result}")
     return result
@@ -92,12 +87,10 @@ def generate_optimized_resume(resume_text: str, suggestions: str, model=DEFAULT_
     )
 
     logger.debug("Sending request to OpenAI for optimized resume generation...")
-    response = openai.ChatCompletion.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=4000,
-        temperature=0.3
-    )
+    response = client.chat.completions.create(model=model,
+    messages=[{"role": "user", "content": prompt}],
+    max_tokens=4000,
+    temperature=0.3)
     result = response.choices[0].message.content.strip()
     logger.debug(f"Optimized resume generated.")
     return result
