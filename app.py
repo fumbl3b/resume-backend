@@ -6,7 +6,6 @@ from flask_cors import CORS
 from openai import OpenAI
 from version import __version__
 from services.file_processor import FileProcessor
-from services.latex_converter import LatexConverter
 
 load_dotenv()
 
