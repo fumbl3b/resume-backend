@@ -4,6 +4,8 @@ services:
     env: docker
     dockerfilePath: ./Dockerfile
     envVars:
+      - key: CORS_ORIGINS
+        value: https://resume-updater-flax.vercel.app,http://localhost:3000
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: OPENAI_API_KEY
