@@ -1,12 +1,10 @@
 FROM python:3.11-slim
 
-# Install minimal TeX packages
+# Install TeX Live (full) plus latexmk
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      texlive-latex-base \
-      texlive-latex-recommended \
-      texlive-fonts-recommended \
-      latexmk && \
+        texlive-full \
+        latexmk && \
     rm -rf /var/lib/apt/lists/*
 
 
