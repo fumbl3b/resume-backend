@@ -1,21 +1,10 @@
 services:
   - type: web
     name: resume-api
-    env: python
-    buildCommand: |
-      apt-get update && \
-      apt-get install -y texlive-full && \
-      apt-get install -y texlive-latex-extra && \
-      apt-get install -y texlive-fonts-recommended && \
-      apt-get install -y latexmk && \
-      export PATH="/usr/local/texlive/2023/bin/x86_64-linux:$PATH" && \
-      which pdflatex && \
-      pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    env: docker
+    dockerfilePath: ./Dockerfile
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: OPENAI_API_KEY
         sync: false
-      - key: PATH
-        value: /usr/local/texlive/2023/bin/x86_64-linux:$PATH
