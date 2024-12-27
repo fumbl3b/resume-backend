@@ -6,6 +6,7 @@ from flask_cors import CORS
 from openai import OpenAI
 from version import __version__
 from services.file_processor import FileProcessor
+from services.latex_converter_2 import LatexConverter2
 
 load_dotenv()
 
@@ -22,6 +23,9 @@ logger.setLevel(logging.DEBUG)
 DEFAULT_MODEL = "gpt-4o"
 
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# Initialize converter
+latex_converter = LatexConverter2()
 
 def generate_error(message, code=400):
     logger.debug(message)
@@ -222,6 +226,35 @@ def api_generate_optimized_resume():
 def convert_to_pdf():
     # TODO: fix this
     pass
+
+@app.route('/convert-latex', methods=['POST'])
+def convert_latex():
+    logger.debug("Received request at /convert-latex endpoint")
+    data = request.get_json()
+    
+    if not data or 'latex_content' not in data:
+        return jsonify({"error": "No LaTeX content provided"}), 400
+        
+    latex_content = data['latex_content']
+    
+    try:
+        # Convert content to both formats
+        tex_base64, pdf_base64 = latex_converter.compile_latex(latex_content)
+        
+        if not pdf_base64:
+            return jsonify({
+                "error": "PDF generation failed",
+                "tex_content": tex_base64
+            }), 206
+            
+        return jsonify({
+            "tex_content": tex_base64,
+            "pdf_content": pdf_base64
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Conversion failed: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 5001))
