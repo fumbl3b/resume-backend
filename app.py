@@ -1,4 +1,5 @@
 import os
+import sys
 import logging
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_file
@@ -16,7 +17,14 @@ app = Flask(__name__)
 app.config['VERSION'] = __version__
 CORS(app)
 
-logging.basicConfig(level=logging.DEBUG)
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 logger = app.logger
 logger.setLevel(logging.DEBUG)
 

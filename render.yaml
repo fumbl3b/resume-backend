@@ -8,3 +8,6 @@ services:
         value: 3.11.0
       - key: OPENAI_API_KEY
         sync: false
+      - key: LOG_LEVEL
+        value: debug
+    plan: starter
