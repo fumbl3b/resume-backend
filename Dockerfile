@@ -28,4 +28,4 @@ ENV PYTHONUNBUFFERED=1
 ENV LOG_LEVEL=debug
 
 # Start command
-CMD ["gunicorn", "--log-level", "debug", "--config", "gunicorn_config.py", "app:app"]
+CMD ["gunicorn", "--log-level", "debug", "--config", "gunicorn_config.py", "run:app"]
