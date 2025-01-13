@@ -32,6 +32,27 @@ def suggest_improvements(resume_text, job_description, model=DEFAULT_MODEL):
     logger.debug(f"Suggestions generated: {result}")
     return result
 
+def apply_improvements(resume_text, suggestions, model=DEFAULT_MODEL):
+    prompt = ( 
+        "You are a professional resume writer skilled in LaTeX formatting. "
+        "You have a non-LaTeX-formatted resume and a set of improvement suggestions. "
+        "Incorporate these suggestions into the resume and add LaTeX formatting and structure. "
+        "Do not remove the original formatting commands, only update text where it makes sense. "
+        "Make sure to incorporate relevant keywords, highlight experiences and skills that match the job description.\n\n"
+        f"Suggestions:\n{suggestions}\n\n"
+        f"Original Resume:\n{resume_text}\n\n"
+        "Return the full updated resume in LaTeX."
+    )
+
+    logger.debug("Sending request to OpenAI for optimized resume generation...")
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=4000,
+        temperature=0.1  # Lower temperature for more consistent output
+    )
+    return response.choices[0].message.content.strip()
+
 @resume_bp.route('/extract-text', methods=['POST'])
 def api_extract_resume_text():
     logger.debug("Received file upload request")
@@ -81,3 +102,28 @@ def api_suggest_improvements():
     
     suggestions = suggest_improvements(resume_text, job_description)
     return jsonify({"suggestions": suggestions})
+
+@resume_bp.route('/apply-improvements', methods=['POST'])
+def api_apply_improvements():
+    logger.debug("Received request at /apply-improvements endpoint")
+    data = request.get_json()
+    response_data = {}
+    
+    if not data:
+        return jsonify({"error": "No JSON data provided"}), 400
+
+    resume_text = data.get('resume_text', '')
+    suggestions = data.get('suggestions', '')
+
+    if not resume_text or not suggestions:
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    try:
+        latex_content = apply_improvements(resume_text, suggestions)
+        response_data["raw_latex"] = latex_content
+        logger.debug(f"LaTeX content generated successfully")
+    except Exception as e:
+        logger.error(f"Failed to generate LaTeX content: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    
+    return jsonify({'tex_content': latex_content})
